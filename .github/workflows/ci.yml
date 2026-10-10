@@ -1,0 +1,39 @@
+name: Rust CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    name: fmt, clippy, build (wasm32-unknown-unknown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy (macros, host)
+        run: cargo clippy -p teloxide-cf-workers-macros -- -D warnings
+
+      - name: clippy (runtime, wasm32)
+        run: cargo clippy -p teloxide-cf-workers --target wasm32-unknown-unknown -- -D warnings
+
+      - name: clippy (runtime + distribution, wasm32)
+        run: cargo clippy -p teloxide-cf-workers --target wasm32-unknown-unknown --features distribution -- -D warnings
+
+      - name: clippy (json-dump example, wasm32)
+        run: cargo clippy -p json-dump --target wasm32-unknown-unknown -- -D warnings
