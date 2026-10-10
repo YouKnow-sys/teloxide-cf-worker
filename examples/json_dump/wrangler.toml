@@ -1,0 +1,16 @@
+name = "json-dump"
+main = "build/index.js"
+compatibility_date = "2026-09-01"
+
+[build]
+command = "cargo install worker-build && worker-build --release"
+
+[durable_objects]
+bindings = [{ name = "TELOXIDE_QUEUE", class_name = "TeloxideUpdateDistributor" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TeloxideUpdateDistributor"]
+
+# BOT_TOKEN is a secret: `npx wrangler secret put BOT_TOKEN`.
+# Set the WEBHOOK_SECRET secret to enforce Telegram's secret-token check.

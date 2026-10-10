@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/teloxide-cf-workers",
+    "crates/teloxide-cf-workers-macros",
+    "examples/json_dump",
+]
+
+[profile.release]
+opt-level = "s"
+lto = true
