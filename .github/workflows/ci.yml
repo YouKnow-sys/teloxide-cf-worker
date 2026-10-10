@@ -27,13 +27,13 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy (macros, host)
-        run: cargo clippy -p teloxide-cf-workers-macros -- -D warnings
+        run: cargo clippy -p teloxide-cf-worker-macros -- -D warnings
 
       - name: clippy (runtime, wasm32)
-        run: cargo clippy -p teloxide-cf-workers --target wasm32-unknown-unknown -- -D warnings
+        run: cargo clippy -p teloxide-cf-worker --target wasm32-unknown-unknown -- -D warnings
 
       - name: clippy (runtime + distribution, wasm32)
-        run: cargo clippy -p teloxide-cf-workers --target wasm32-unknown-unknown --features distribution -- -D warnings
+        run: cargo clippy -p teloxide-cf-worker --target wasm32-unknown-unknown --features distribution -- -D warnings
 
       - name: clippy (json-dump example, wasm32)
         run: cargo clippy -p json-dump --target wasm32-unknown-unknown -- -D warnings

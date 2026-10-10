@@ -12,7 +12,7 @@
 //! use teloxide::adaptors::CacheMe;
 //! use teloxide::dispatching::{DefaultKey, Dispatcher};
 //! use teloxide::prelude::*;
-//! use teloxide_cf_workers::{bot, runtime::console_error_handler, worker::{self, Env}};
+//! use teloxide_cf_worker::{bot, runtime::console_error_handler, worker::{self, Env}};
 //!
 //! type HandlerError = Box<dyn std::error::Error + Send + Sync>;
 //!
@@ -43,7 +43,7 @@
 //! [`Dispatcher::dispatch_one`]:
 //! teloxide::dispatching::Dispatcher::dispatch_one
 
-pub use teloxide_cf_workers_macros::bot;
+pub use teloxide_cf_worker_macros::bot;
 
 pub use worker;
 

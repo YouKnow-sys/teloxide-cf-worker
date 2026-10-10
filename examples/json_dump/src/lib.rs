@@ -9,7 +9,7 @@ use teloxide::dispatching::{DefaultKey, Dispatcher};
 use teloxide::prelude::*;
 use teloxide::types::{ParseMode, Update};
 use teloxide::utils;
-use teloxide_cf_workers::{
+use teloxide_cf_worker::{
     bot,
     durable::default_key,
     runtime::console_error_handler,

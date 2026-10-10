@@ -41,7 +41,7 @@ where
     E: std::fmt::Display + Send + 'static,
 {
     Arc::new(|err: E| async move {
-        worker::console_error!("teloxide-cf-workers: update handler error: {err}");
+        worker::console_error!("teloxide-cf-worker: update handler error: {err}");
     })
 }
 
@@ -60,7 +60,7 @@ pub(crate) async fn get_dp(env: &Env) -> worker::Result<&'static dyn DispatchDyn
     Ok(&***DP
         .get_or_try_init(|| async {
             let dp = (def.build)(env.clone()).await.inspect_err(|e| {
-                worker::console_error!("teloxide-cf-workers: failed to build the bot: {e}");
+                worker::console_error!("teloxide-cf-worker: failed to build the bot: {e}");
             })?;
             Ok::<_, worker::Error>(SendWrapper::new(dp))
         })
@@ -70,7 +70,7 @@ pub(crate) async fn get_dp(env: &Env) -> worker::Result<&'static dyn DispatchDyn
 /// Serves the health check and the webhook: verifies the secret, then
 /// dispatches the update inline or forwards it to its Durable Object.
 #[::worker::event(fetch)]
-async fn workers_fetch(
+async fn worker_fetch(
     mut req: Request,
     env: Env,
     _ctx: worker::Context,
@@ -124,7 +124,7 @@ fn secret_check(
     let Some(secret) = secret else {
         if required {
             worker::console_error!(
-                "teloxide-cf-workers: secret binding `{binding}` is not set or empty; pass `verify_secret = false` (insecure, local dev only) to allow it"
+                "teloxide-cf-worker: secret binding `{binding}` is not set or empty; pass `verify_secret = false` (insecure, local dev only) to allow it"
             );
             return Some((500, "webhook secret not configured"));
         }
@@ -143,7 +143,7 @@ fn secret_check(
 /// silently deserializes teloxide updates into `UpdateKind::Error`.
 pub fn parse_update(bytes: &[u8]) -> worker::Result<teloxide::types::Update> {
     serde_json::from_slice(bytes).map_err(|e| {
-        worker::console_error!("teloxide-cf-workers: failed to parse update: {e}");
+        worker::console_error!("teloxide-cf-worker: failed to parse update: {e}");
         worker::Error::from(format!("failed to parse update: {e}"))
     })
 }
@@ -152,7 +152,7 @@ pub(crate) async fn dispatch_with_timeout(dp: &dyn DispatchDyn, update: Update) 
     let timer = std::pin::pin!(worker::Delay::from(HANDLER_TIMEOUT));
     if let Either::Right(_) = select(dp.dispatch_update(update), timer).await {
         worker::console_error!(
-            "teloxide-cf-workers: handler exceeded {}s and was cancelled; the update was acknowledged",
+            "teloxide-cf-worker: handler exceeded {}s and was cancelled; the update was acknowledged",
             HANDLER_TIMEOUT.as_secs()
         );
     }

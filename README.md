@@ -1,4 +1,4 @@
-# teloxide-cf-workers
+# teloxide-cf-worker
 
 Run a [teloxide] bot as a [Cloudflare Worker]. The `#[bot]` attribute macro
 generates the webhook entrypoint (secret-token check, update parsing,
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 teloxide = { git = "https://github.com/YouKnow-sys/teloxide", branch = "wasm", default-features = false, features = ["cache-me"] }
-teloxide-cf-workers = { git = "https://github.com/YouKnow-sys/teloxide-cf-workers" }
+teloxide-cf-worker = { git = "https://github.com/YouKnow-sys/teloxide-cf-worker" }
 ```
 
 `src/lib.rs`:
@@ -27,7 +27,7 @@ teloxide-cf-workers = { git = "https://github.com/YouKnow-sys/teloxide-cf-worker
 use teloxide::adaptors::CacheMe;
 use teloxide::dispatching::{DefaultKey, Dispatcher};
 use teloxide::prelude::*;
-use teloxide_cf_workers::{
+use teloxide_cf_worker::{
     bot,
     runtime::console_error_handler,
     worker::{self, Env},
@@ -103,11 +103,11 @@ at a time (dialogues, per-chat state), enable the `distribution` feature, name
 a key function on `#[bot]`, and add the Durable Object binding.
 
 ```toml
-teloxide-cf-workers = { git = "https://github.com/YouKnow-sys/teloxide-cf-workers", features = ["distribution"] }
+teloxide-cf-worker = { git = "https://github.com/YouKnow-sys/teloxide-cf-worker", features = ["distribution"] }
 ```
 
 ```rust
-#[bot(distribution = teloxide_cf_workers::durable::default_key)]
+#[bot(distribution = teloxide_cf_worker::durable::default_key)]
 ```
 
 ```toml
@@ -168,7 +168,7 @@ Then build the storage from the binding and a serializer:
 
 ```rust
 use teloxide::dispatching::dialogue::serializer::Json;
-use teloxide_cf_workers::storage::D1Storage;
+use teloxide_cf_worker::storage::D1Storage;
 
 let storage = D1Storage::new(env.d1("DB")?, Json);
 

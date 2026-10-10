@@ -1,4 +1,4 @@
-//! Attribute macro for the `teloxide-cf-workers` runtime crate. See that
+//! Attribute macro for the `teloxide-cf-worker` runtime crate. See that
 //! crate's docs; it is re-exported there as `#[bot]`.
 
 use proc_macro::TokenStream;
@@ -44,9 +44,9 @@ impl Parse for BotArg {
 ///
 /// All optional, `key = value`:
 /// - `distribution = path`: per-key serialized handling through Durable
-///   Objects; needs `features = ["distribution"]` on the teloxide-cf-workers
+///   Objects; needs `features = ["distribution"]` on the teloxide-cf-worker
 ///   dependency (using it without the feature is a compile error, and so is
-///   referencing `teloxide_cf_workers::durable::default_key`).
+///   referencing `teloxide_cf_worker::durable::default_key`).
 ///   `fn(&Update) -> Option<String>` names the Durable Object instance per
 ///   update: `Some(key)` is forwarded to instance `key` and handled one at a
 ///   time (mutual exclusion; arrival order across isolates is best-effort),
@@ -81,11 +81,11 @@ impl Parse for BotArg {
 /// use teloxide::adaptors::CacheMe;
 /// use teloxide::dispatching::{DefaultKey, Dispatcher};
 /// use teloxide::prelude::*;
-/// use teloxide_cf_workers::{bot, runtime::console_error_handler, worker::Env};
+/// use teloxide_cf_worker::{bot, runtime::console_error_handler, worker::Env};
 ///
 /// type HandlerError = Box<dyn std::error::Error + Send + Sync>;
 ///
-/// #[bot(distribution = teloxide_cf_workers::durable::default_key)]
+/// #[bot(distribution = teloxide_cf_worker::durable::default_key)]
 /// async fn main(env: Env)
 /// -> Dispatcher<CacheMe<Bot>, HandlerError, DefaultKey> {
 ///     let bot: CacheMe<Bot> =
@@ -98,7 +98,7 @@ impl Parse for BotArg {
 /// ```
 ///
 /// Handler errors go to the dispatcher's error handler: set one that logs
-/// (e.g. `teloxide_cf_workers::runtime::console_error_handler`), or they are
+/// (e.g. `teloxide_cf_worker::runtime::console_error_handler`), or they are
 /// invisible on Workers.
 #[proc_macro_attribute]
 pub fn bot(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -168,11 +168,11 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
     let secret = match secret {
         Some(secret) => quote! { #secret },
-        None => quote! { ::teloxide_cf_workers::runtime::DEFAULT_SECRET_BINDING },
+        None => quote! { ::teloxide_cf_worker::runtime::DEFAULT_SECRET_BINDING },
     };
     let path = match path {
         Some(path) => quote! { #path },
-        None => quote! { ::teloxide_cf_workers::runtime::DEFAULT_WEBHOOK_PATH },
+        None => quote! { ::teloxide_cf_worker::runtime::DEFAULT_WEBHOOK_PATH },
     };
     let verify_secret = match verify_secret {
         Some(verify_secret) => quote! { #verify_secret },
@@ -182,7 +182,7 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         Some(distribution) => {
             let binding = match binding {
                 Some(binding) => quote! { #binding },
-                None => quote! { ::teloxide_cf_workers::runtime::DEFAULT_DO_BINDING },
+                None => quote! { ::teloxide_cf_worker::runtime::DEFAULT_DO_BINDING },
             };
             quote! { ::std::option::Option::Some((#binding, #distribution)) }
         }
@@ -194,8 +194,8 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     let feature_check = match &distribution {
         Some(_) => quote! {
             const _: () = ::std::assert!(
-                ::teloxide_cf_workers::DISTRIBUTION_ENABLED,
-                "`#[bot(distribution = ...)]` needs the `distribution` feature of teloxide-cf-workers",
+                ::teloxide_cf_worker::DISTRIBUTION_ENABLED,
+                "`#[bot(distribution = ...)]` needs the `distribution` feature of teloxide-cf-worker",
             );
         },
         None => quote! {},
@@ -203,19 +203,19 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
     let start = quote! {
         // Through the prelude: the bare re-export path lacks the attribute macro.
-        #[::teloxide_cf_workers::worker::wasm_bindgen::prelude::wasm_bindgen(
+        #[::teloxide_cf_worker::worker::wasm_bindgen::prelude::wasm_bindgen(
             start,
-            wasm_bindgen = ::teloxide_cf_workers::worker::wasm_bindgen,
+            wasm_bindgen = ::teloxide_cf_worker::worker::wasm_bindgen,
         )]
-        fn __teloxide_cf_workers_start() {
-            ::teloxide_cf_workers::__register(::teloxide_cf_workers::BotDef {
+        fn __teloxide_cf_worker_start() {
+            ::teloxide_cf_worker::__register(::teloxide_cf_worker::BotDef {
                 path: #path,
                 secret_binding: #secret,
                 distribution: #distribution_arg,
                 verify_secret: #verify_secret,
                 build: |env| {
                     ::std::boxed::Box::pin(async move {
-                        ::teloxide_cf_workers::IntoDispatcher::into_dispatcher(
+                        ::teloxide_cf_worker::IntoDispatcher::into_dispatcher(
                             #item_ident(env).await,
                         )
                     })

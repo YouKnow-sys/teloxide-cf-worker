@@ -56,7 +56,7 @@ pub(crate) async fn forward(
         // 503 = queue full; Telegram re-delivers.
         Ok(res) => Response::error("update not accepted", res.status_code()),
         Err(e) => {
-            worker::console_error!("teloxide-cf-workers: durable object fetch failed: {e}");
+            worker::console_error!("teloxide-cf-worker: durable object fetch failed: {e}");
             Response::error("durable object unavailable", 502)
         }
     }

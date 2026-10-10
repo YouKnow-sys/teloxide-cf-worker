@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/teloxide-cf-workers",
-    "crates/teloxide-cf-workers-macros",
+    "crates/teloxide-cf-worker",
+    "crates/teloxide-cf-worker-macros",
     "examples/json_dump",
 ]
 
