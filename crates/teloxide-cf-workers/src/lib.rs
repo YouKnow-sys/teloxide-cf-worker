@@ -35,6 +35,8 @@
 //! routed to the Durable Object instance named by the key fn, serializing
 //! updates per key; see [`bot`] and the README.
 //!
+//! With the `storage` feature, `storage::D1Storage` keeps teloxide dialogues
+//! in a D1 database; the table comes from a migration, see the README.
 //!
 //! [teloxide]: https://github.com/YouKnow-sys/teloxide
 //! [Cloudflare Worker]: https://developers.cloudflare.com/workers/
@@ -48,6 +50,8 @@ pub use worker;
 #[cfg(feature = "distribution")]
 pub mod durable;
 pub mod runtime;
+#[cfg(feature = "storage")]
+pub mod storage;
 
 use std::future::Future;
 use std::pin::Pin;

@@ -1,10 +1,12 @@
 # teloxide-cf-workers
 
-Run a [teloxide] bot as a [Cloudflare Worker]. One attribute macro, `#[bot]`,
+Run a [teloxide] bot as a [Cloudflare Worker]. The `#[bot]` attribute macro
 generates the webhook entrypoint (secret-token check, update parsing,
-dispatcher cache) around the function where you build your bot and dispatcher.
-See [`examples/json_dump`](examples/json_dump) for a complete, deployable
-bot.
+dispatcher cache) around the function where you build your bot. A complete,
+deployable bot is in [`examples/json_dump`](examples/json_dump).
+
+Optional cargo features: `distribution` (per-chat serialization with Durable
+Objects) and `storage` (dialogue storage in D1).
 
 ## Quickstart
 
@@ -70,15 +72,15 @@ npx wrangler secret put WEBHOOK_SECRET
 npx wrangler deploy
 ```
 
-The `#[bot]` fn runs once per isolate, so keep it cheap. Returning a `Result`
-is optional; an `Err` is logged and requests answer 500 until the fn succeeds.
-`CacheMe` avoids a `get_me` call on every update; you can pass `Me` through
-`.dependencies(..)` instead. A handler running longer than 25 s is cancelled
-and its update acknowledged, both inline and in a Durable Object.
+- The `#[bot]` fn runs once per isolate, so keep it cheap. It may return the
+  dispatcher directly or a `Result` of it; an `Err` is logged and
+  requests answer 500 until the fn succeeds.
+- `CacheMe` saves a `get_me` call per update; passing `Me` through
+  `.dependencies(..)` works too.
 
 ## Registering the webhook
 
-Register the webhook once.
+Register the webhook once:
 
 ```sh
 curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" \
@@ -88,20 +90,24 @@ curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" \
 ```
 
 - `secret_token` (1-256 chars of `A-Za-z0-9_-`) must equal the worker's
-  `WEBHOOK_SECRET` secret. A wrong token gets a 403; an unset secret gets a 500.
+  `WEBHOOK_SECRET` secret. A wrong token gets a 403, an unset secret a 500.
 - The URL path must match `#[bot(path = ...)]` (default `/webhook`).
-- `wrangler dev` needs `WEBHOOK_SECRET` in `.dev.vars`.
-- `-d max_connections=1` makes Telegram send one update at a time, with no
-  Durable Objects needed. A slow handler then stalls the whole bot.
+- Teloxide's own listeners derive `allowed_updates` from your handlers; here
+  you should pass it yourself, for example
+  `-d allowed_updates='["message","callback_query","chat_member"]'`.
 
 ## Per-chat serialization (Durable Objects)
 
-By default updates are handled concurrently. To handle one chat's updates one
-at a time (dialogues, per-chat state), enable the `distribution` feature, pass
-a key function, and add the Durable Object binding.
+Updates are handled concurrently by default. To handle one chat's updates one
+at a time (dialogues, per-chat state), enable the `distribution` feature, name
+a key function on `#[bot]`, and add the Durable Object binding.
 
 ```toml
 teloxide-cf-workers = { git = "https://github.com/YouKnow-sys/teloxide-cf-workers", features = ["distribution"] }
+```
+
+```rust
+#[bot(distribution = teloxide_cf_workers::durable::default_key)]
 ```
 
 ```toml
@@ -114,33 +120,70 @@ tag = "v1"
 new_sqlite_classes = ["TeloxideUpdateDistributor"]
 ```
 
-Use `new_sqlite_classes` on every plan (required on free, recommended on paid).
-
-```rust
-fn user_key(update: &Update) -> Option<String> {
-    update.from().map(|u| u.id.to_string())
-}
-
-#[bot(distribution = user_key)]
-async fn main(env: Env) -> worker::Result<Dispatcher<CacheMe<Bot>, HandlerError, DefaultKey>> {
-    /* ... */
-}
-```
-
-Updates for which the function returns `None` are handled inline, concurrently.
-`teloxide_cf_workers::durable::default_key` groups by chat id.
+Use `new_sqlite_classes` on every plan (required on free, recommended on
+paid). `default_key` groups by chat id; write your own
+`fn(&Update) -> Option<String>` to group differently, where `None` handles
+that update inline.
 
 - Handlers for one key never overlap. Order is the order updates reach the
   Durable Object, which can differ from Telegram's when it delivers
   concurrently.
-- The webhook response is sent after the update is handled, so Telegram
-  re-delivers if the worker dies mid-handling.
-- The same 25 s handler timeout applies, so a hung handler can't stall the
-  key's queue.
 - At most 64 updates wait per key; more get a 503 and Telegram retries later.
 - Each update costs one extra Durable Object request.
+- Without `distribution` there is no Durable Object, binding or migration. The
+  alternative is `-d max_connections=1` in `setWebhook`, which makes Telegram
+  send one update at a time, but then a slow handler stalls the whole bot.
 
-Without `distribution` no Durable Object is used: no binding, no migration.
+## Dialogue storage (D1)
+
+`D1Storage` (feature `storage`) stores teloxide dialogues in D1 and implements
+teloxide's `Storage` trait. Bind the database:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "<db-name>"
+database_id = "<id>"
+```
+
+The library never creates the table at runtime. Create the database, then
+paste the SQL below into the migration file that `migrations create`
+generates, before applying it:
+
+```console
+npx wrangler d1 create <db-name>
+npx wrangler d1 migrations create <db-name> add_dialogues
+npx wrangler d1 migrations apply <db-name> --local
+npx wrangler d1 migrations apply <db-name> --remote
+```
+
+```sql
+CREATE TABLE teloxide_dialogues (
+    chat_id  INTEGER PRIMARY KEY,
+    dialogue BLOB NOT NULL
+) STRICT;
+```
+
+Then build the storage from the binding and a serializer:
+
+```rust
+use teloxide::dispatching::dialogue::serializer::Json;
+use teloxide_cf_workers::storage::D1Storage;
+
+let storage = D1Storage::new(env.d1("DB")?, Json);
+
+Dispatcher::builder(
+    bot,
+    dptree::entry()
+        .branch(dialogue::enter::<Update, D1Storage<Json>, State, _>().endpoint(handler)),
+)
+.dependencies(dptree::deps![storage])
+.build()
+```
+
+- Combine it with `distribution`: without per-chat serialization, concurrent
+  updates for one chat can overwrite each other's dialogue state.
+- `no such table: teloxide_dialogues` means the migration was not applied.
 
 ## `#[bot]` arguments
 
@@ -155,9 +198,13 @@ Without `distribution` no Durable Object is used: no binding, no migration.
 ## Caveats
 
 - `InMemStorage` and other in-process state are per isolate and ephemeral. Use
-  KV, D1 or Durable Object storage for dialogues and other state.
-- Updates are acknowledged only after handling, so a handler slower than
-  Telegram's webhook timeout can cause duplicate deliveries.
+  D1 dialogue storage for dialogues, and KV, D1 or Durable Object storage for
+  other state.
+- Updates are acknowledged after handling, under a 25s handler timeout.
+  A handler that is cancelled by the timeout still has its update
+  acknowledged, and one slower than Telegram's webhook timeout can cause
+  duplicate deliveries. Keep handlers short and idempotent, and move long jobs
+  to a Cloudflare Queue or Workflow.
 - Handler errors go to the dispatcher's error handler. Teloxide's default
   logger has no output on Workers, so use `console_error_handler()`.
 - One `#[bot]` per crate.

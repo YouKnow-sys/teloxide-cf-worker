@@ -1427,13 +1427,15 @@ dependencies = [
 
 [[package]]
 name = "teloxide-cf-workers"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "futures-util",
+ "serde",
  "serde_json",
  "teloxide",
  "teloxide-cf-workers-macros",
+ "thiserror",
  "tokio",
  "wasm-bindgen",
  "worker",
